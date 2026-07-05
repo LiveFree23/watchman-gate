@@ -1,0 +1,25 @@
+name: Watchman Gate
+
+on:
+  schedule:
+    # Every 20 minutes (times are UTC). Widen to "0 * * * *" for hourly.
+    - cron: "*/20 * * * *"
+  workflow_dispatch: {} # lets you run it by hand from the Actions tab
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: node poll.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IMAP_PW_LF: ${{ secrets.IMAP_PW_LF }}
+          IMAP_PW_AL: ${{ secrets.IMAP_PW_AL }}
+          IMAP_PW_CP: ${{ secrets.IMAP_PW_CP }}
