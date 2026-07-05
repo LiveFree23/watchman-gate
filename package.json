@@ -1,0 +1,10 @@
+{
+  "name": "watchman-gate",
+  "private": true,
+  "type": "module",
+  "description": "The Gate — email triage poller for The Watchman",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "imapflow": "^1.0.164"
+  }
+}
