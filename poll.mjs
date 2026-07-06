@@ -39,6 +39,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
+// Sweep activity totals for the heartbeat stamp (see the run section at the bottom).
+let totalLooked = 0;
+let totalFlagged = 0;
+
 function need(name) {
   const v = process.env[name];
   if (!v) {
@@ -192,6 +196,8 @@ async function sweep(acct) {
       if (error) console.error("  upsert error", error.message);
       else flagged++;
     }
+    totalLooked += candidates.length;
+    totalFlagged += flagged;
     console.log(`  ${acct.user}: ${candidates.length} looked at, ${fresh.length} new, ${flagged} flagged to the Gate`);
   } finally {
     await client.logout().catch(() => {});
@@ -199,12 +205,32 @@ async function sweep(acct) {
 }
 
 // ── run all inboxes; one failure never kills the others ─────────────────────
+//  After the run, stamp a heartbeat so the app can show LAST SWEPT and go amber
+//  if this job ever silently stops — a dead-man's-switch for the perimeter.
 console.log(`Watchman sweep @ ${new Date().toISOString()}`);
+let sweepOk = true;
 for (const acct of ACCOUNTS) {
   try {
     await sweep(acct);
   } catch (e) {
+    sweepOk = false;
     console.error(`  ! ${acct.user} failed:`, e.message);
   }
 }
+
+try {
+  const { error } = await supabase.from("sweep_heartbeat").upsert({
+    id: "gate",
+    last_run_at: new Date().toISOString(),
+    looked_at: totalLooked,
+    flagged: totalFlagged,
+    ok: sweepOk,
+    detail: sweepOk ? null : "one or more inboxes errored — see the run log",
+  });
+  if (error) console.error("heartbeat upsert failed:", error.message);
+  else console.log(`heartbeat stamped — looked ${totalLooked}, flagged ${totalFlagged}, ok ${sweepOk}`);
+} catch (e) {
+  console.error("heartbeat upsert threw:", e.message);
+}
+
 console.log("sweep complete");
