@@ -7,6 +7,11 @@
 //
 //  Passwords are NEVER in this file — they come from GitHub secrets by name.
 //  The inbox is never modified; your mail app keeps the real copy.
+//
+//  UPGRADE: the final write is now an UPSERT on message_id (was insert), so the
+//  unique index from upgrade.sql enforces no-double-flagging at the DB — even if
+//  a duplicate ever gets past the pre-check below (concurrent run, or the same
+//  message-id in two inboxes). This is the ONLY line the upgrade changed.
 // ============================================================================
 
 import { ImapFlow } from "imapflow";
@@ -166,19 +171,25 @@ async function sweep(acct) {
       const fromStr = m.fromName === m.fromAddr ? m.fromAddr : `${m.fromName} <${m.fromAddr}>`;
       const verdict = await classify(fromStr, m.subject);
       if (!verdict || !verdict.important) continue;
-      const { error } = await supabase.from("triage_queue").insert({
-        sender: m.fromName,
-        sender_account: acct.user,
-        subject: m.subject,
-        message_id: m.messageId,
-        reason: (verdict.reason || "Flagged by triage").slice(0, 200),
-        suggested_title: (verdict.suggested_title || `Follow up: ${m.subject}`).slice(0, 200),
-        suggested_brand: acct.brand,
-        suggested_priority: ["high", "med", "low"].includes(verdict.priority) ? verdict.priority : "med",
-        received_at: m.date,
-        status: "pending",
-      });
-      if (error) console.error("  insert error", error.message);
+      // UPSERT (was insert): on message_id conflict, do nothing. The unique index
+      // from upgrade.sql is the backstop so a duplicate can never double-create
+      // or throw a unique-violation error.
+      const { error } = await supabase.from("triage_queue").upsert(
+        {
+          sender: m.fromName,
+          sender_account: acct.user,
+          subject: m.subject,
+          message_id: m.messageId,
+          reason: (verdict.reason || "Flagged by triage").slice(0, 200),
+          suggested_title: (verdict.suggested_title || `Follow up: ${m.subject}`).slice(0, 200),
+          suggested_brand: acct.brand,
+          suggested_priority: ["high", "med", "low"].includes(verdict.priority) ? verdict.priority : "med",
+          received_at: m.date,
+          status: "pending",
+        },
+        { onConflict: "message_id", ignoreDuplicates: true }
+      );
+      if (error) console.error("  upsert error", error.message);
       else flagged++;
     }
     console.log(`  ${acct.user}: ${candidates.length} looked at, ${fresh.length} new, ${flagged} flagged to the Gate`);
