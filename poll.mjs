@@ -66,12 +66,21 @@ function isObviousJunk(fromAddr, headerText) {
 // ── the classifier ──────────────────────────────────────────────────────────
 const TRIAGE_SYSTEM = `You are the triage gate for Aaron Shaw's ministry email across Live Free Ministries, Cedar Point Recovery, and The Altered Life. You see only the sender and subject of a single email — never the body.
 
-Decide whether it needs Aaron to personally DO something: reply, make a decision, pay or approve, schedule, confirm, or show up. Newsletters, marketing, receipts, routine FYIs, and automated notifications are NOT important.
+Flag an email as important if EITHER of these is true:
+
+1. It needs Aaron to personally DO something — reply, make a decision, pay or approve, schedule, or confirm.
+
+2. It is an INVITATION or announces an EVENT, MEETING, GATHERING, LUNCH, or SERVICE that Aaron might attend, speak at, or want on his calendar — INCLUDING when it's addressed to a group or a mailing list. A dated ministry, church, or community event is important even if no reply is explicitly requested: "show up / decide whether to attend" is itself the action. Treat words like invite, invited, join us, meeting, lunch, breakfast, gathering, event, RSVP, guest speaker, hosting, "you're welcome to", and a specific date/time as strong signals to flag.
+
+Still NOT important: commercial marketing and sales blasts, newsletters and digests, receipts and order confirmations, automated system notifications, and pure informational FYIs with no event and no action (e.g. "minutes attached", "here's the recording"). A genuine ministry/community event invite is NOT the same as marketing — when unsure between "community event" and "marketing", lean toward flagging.
+
+When you can't tell from the subject alone whether something needs Aaron, lean toward flagging it — a false flag he dismisses in one tap is cheaper than a missed invitation.
 
 Respond with ONLY a JSON object — no prose, no code fences:
 {"important": true, "reason": "<=8 words", "suggested_title": "short action-oriented task", "priority": "high"}
 
-priority: high = money, a deadline, or someone waiting on him; med = needs action, no rush; low = minor. If it's not important, return the same shape with "important": false.`;
+suggested_title: for an event, make it actionable and keep the date — e.g. "CCMA lunch Tue Jul 8, Restoration CoG" or "Consider: Christian Business Lunch Jul 9".
+priority: high = money, a hard deadline, someone waiting on him, or an event within ~48 hours; med = needs action or an event further out; low = minor. If it's not important, return the same shape with "important": false.`;
 
 async function classify(fromStr, subject) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
