@@ -183,6 +183,8 @@ async function sweep(acct) {
     for (const m of fresh) {
       const fromStr = m.fromName === m.fromAddr ? m.fromAddr : `${m.fromName} <${m.fromAddr}>`;
       const verdict = await classify(fromStr, m.subject);
+      // DEBUG: show exactly what Haiku decided for each subject. Remove once tuned.
+      console.log(`  DEBUG subj="${(m.subject || "").slice(0, 70)}" -> ${verdict ? JSON.stringify(verdict) : "NULL (no verdict / parse failed)"}`);
       if (!verdict || !verdict.important) continue;
       // UPSERT (was insert): on message_id conflict, do nothing. The unique index
       // from upgrade.sql is the backstop so a duplicate can never double-create
