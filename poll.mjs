@@ -53,12 +53,17 @@ function need(name) {
 }
 
 // ── junk pre-filter (free — keeps obvious noise away from the classifier) ────
+// The Watchman's own daily digest is sent from this address; never let the Gate
+// triage its own briefing. Change this if DIGEST_FROM ever changes.
+const SELF_SENDER = "mail@watchman.thealteredlife.org";
+
 function isObviousJunk(fromAddr, headerText) {
+  const a = (fromAddr || "").toLowerCase();
+  if (a === SELF_SENDER) return true; // the Watchman never flags itself
   const h = (headerText || "").toLowerCase();
   if (h.includes("list-unsubscribe")) return true;
   if (h.includes("precedence: bulk") || h.includes("precedence: list")) return true;
   if (h.includes("auto-submitted:") && !h.includes("auto-submitted: no")) return true;
-  const a = (fromAddr || "").toLowerCase();
   if (/(no[-_.]?reply|donotreply|do-not-reply|mailer-daemon|postmaster|bounce|notification)/.test(a)) return true;
   return false;
 }
@@ -183,8 +188,6 @@ async function sweep(acct) {
     for (const m of fresh) {
       const fromStr = m.fromName === m.fromAddr ? m.fromAddr : `${m.fromName} <${m.fromAddr}>`;
       const verdict = await classify(fromStr, m.subject);
-      // DEBUG: show exactly what Haiku decided for each subject. Remove once tuned.
-      console.log(`  DEBUG subj="${(m.subject || "").slice(0, 70)}" -> ${verdict ? JSON.stringify(verdict) : "NULL (no verdict / parse failed)"}`);
       if (!verdict || !verdict.important) continue;
       // UPSERT (was insert): on message_id conflict, do nothing. The unique index
       // from upgrade.sql is the backstop so a duplicate can never double-create
